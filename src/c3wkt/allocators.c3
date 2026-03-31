@@ -11,7 +11,6 @@ interface Allocator
     fn void*? acquire(usz size, uint tag);
 
     // TODO: reallocate memory
-    //
     // fn void*? resize(void* ptr, uint tag, usz new_size);
 
     // free memory
