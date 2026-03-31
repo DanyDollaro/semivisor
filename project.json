@@ -7,7 +7,7 @@
   "dependency-search-paths": [ "lib" ],
   // Libraries to use for all targets.
   "dependencies": [ ],
-  "linker-search-paths": [ "static-libs/windows-x64", "static-libs/windows-x64/wdk" ],
+  "linker-search-paths": [ "static-libs/windows-x64/nasm", "static-libs/windows-x64/wdk" ],
   "linked-libraries": [ "hal", "ntoskrnl", "ntstrsafe", "wdm", "win32k", "serial_intrin" ],
   // Authors, optionally with email.
   "authors": [ "John Doe <john.doe@example.com>" ],

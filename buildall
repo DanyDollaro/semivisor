@@ -1,16 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REMOTE="vict"
-REMOTE_DIR="C:/ScpProvisioning"
 SYS_FILE="./build/semivisor.sys"
 EXE_FILE="./build/semivisor.exe"
 NASM_SRC_DIR="./nasm"
 NASM_OBJ_DIR="./nasm/objs"
-NASM_LIB_DIR="./static-libs/windows-x64/"
-CERT="C:/WdkCert.pfx"
-CERT_PASS="pass"
-SERVICE_NAME="semi"
+NASM_LIB_DIR="./static-libs/windows-x64/nasm/"
 
 log()  { echo -e "\e[34m[*]\e[0m $*"; }
 ok()   { echo -e "\e[32m[+]\e[0m $*"; }

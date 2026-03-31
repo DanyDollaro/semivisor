@@ -16,5 +16,7 @@ fn NtStatus driver_entry(DriverObject* driver_object, UnicodeString* registry_pa
     logger::init();
     logger::print(">>>>>>>>>>>>>>>>>>>>>>> DRIVER COMPILED AT %s %s <<<<<<<<<<<<<<<<<<<<<<<", $$DATE, $$TIME);
 
+
+
     return wdk::STATUS_SUCCESS;
 }
