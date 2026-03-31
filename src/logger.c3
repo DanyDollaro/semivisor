@@ -1,4 +1,6 @@
-module serial;
+module logger;
+
+import wdk;
 
 /* ============================================================================================== */
 /* Imported functions                                                                             */
@@ -11,12 +13,12 @@ extern fn char read_port_uchar(void* port) @extern("read_port_uchar");
 /* Constants                                                                                      */
 /* ============================================================================================== */
 
-const void* COM1 = (void*)0x3F8;
-const void* COM2 = (void*)0x2F8;
-const void* COM3 = (void*)0x3E8;
-const void* COM4 = (void*)0x2E8;
+const void* COM_PORT_1 = (void*)0x3F8;
+const void* COM_PORT_2 = (void*)0x2F8;
+const void* COM_PORT_3 = (void*)0x3E8;
+const void* COM_PORT_4 = (void*)0x2E8;
 
-const void* DEFAULT_COM = COM2;
+const void* DEFAULT_COM_PORT = COM_PORT_2;
 
 const uptr REG_DATA       = 0; // RX / TX
 const uptr REG_INT_EN     = 1; // Interrupt enable
@@ -43,23 +45,23 @@ const char BAUD_9600_MSB   = 0x00;
 /* Private functions                                                                              */
 /* ============================================================================================== */
 
-fn void write_reg(void* base, uptr offset, char value) @inline
+fn void write_reg(void* base, uptr offset, char value) @private @inline
 {
     write_port_uchar((void*)((uptr)base + offset), value);
 }
 
-fn char read_reg(void* base, uptr offset) @inline
+fn char read_reg(void* base, uptr offset) @private @inline
 {
     return read_port_uchar((void*)((uptr)base + offset));
 }
 
 /* ============================================================================================== */
-/* Imported functions                                                                             */
+/* Exported functions                                                                             */
 /* ============================================================================================== */
 
 // Initialize the UART: 115200 8N1, FIFO enabled, interrupts disabled.
-// Call once before any write. Pass a different base to target COM2/3/4.
-fn void init(void* base = COM2)
+// Call once before any write. Pass a different base to target COM_PORT_2/3/4.
+fn void init(void* base = COM_PORT_2)
 {
     write_reg(base, REG_INT_EN,     0x00);       // disable all UART interrupts
 
@@ -72,15 +74,20 @@ fn void init(void* base = COM2)
     write_reg(base, REG_MODEM_CTRL, MCR_DTR_RTS);
 }
 
+fn void destroy()
+{
+    // actually nothing
+}
+
 // Block until the TX holding register is empty, then write one byte.
-fn void write_char(char c, void* base = DEFAULT_COM)
+fn void write_char(char c, void* base = DEFAULT_COM_PORT)
 {
     while ((read_reg(base, REG_LINE_STAT) & LSR_THR_EMPTY) == 0) {}
     write_reg(base, REG_DATA, c);
 }
 
 // Write a null-terminated string.
-fn void write_string(char[] str, void* base = DEFAULT_COM)
+fn void write_string(char[] str, void* base = DEFAULT_COM_PORT)
 {
     foreach (c : str)
     {
@@ -89,11 +96,37 @@ fn void write_string(char[] str, void* base = DEFAULT_COM)
 }
 
 // Write a null-terminated string followed by "\r\n".
-fn void write_line(char[] str, void* base = DEFAULT_COM)
+fn void write_line(char[] str, void* base = DEFAULT_COM_PORT)
 {
     write_string(str, base);
     write_char('\r', base);
     write_char('\n', base);
+}
+
+macro void print($format, ...)
+{
+    char[512] buffer;
+    wdk::sprintf_s(&buffer, buffer.len, $format, $vasplat);
+    write_line(buffer[..]);
+}
+
+macro void debug_log($format, ...)
+{
+    LargeInteger time_stamp;
+    wdk::keQuerySystemTimePrecise(&time_stamp);
+    wdk::exSystemTimeToLocalTime(&time_stamp, &time_stamp);
+
+    TimeFields time;
+    wdk::rtlTimeToTimeFields(&time_stamp, &time);
+
+    uint core = wdk::keGetCurrentProcessorNumberEx(null);
+
+    char[512] buffer;
+    String $final_format = "[" +++ $$MODULE +++ ":" +++ $$FUNC +++ "] %02hu:%02hu:%02hu.%03hu #%Xh > " +++
+        $format +++ "\r\n";
+    wdk::sprintf_s(&buffer, buffer.len, $final_format, time.hour, time.minute, time.second, time.milliseconds, core, $vasplat);
+
+    write_string(buffer[..]);
 }
 
 /* ============================================================================================== */

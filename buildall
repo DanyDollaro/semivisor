@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+REMOTE="vict"
+REMOTE_DIR="C:/ScpProvisioning"
+SYS_FILE="./build/semivisor.sys"
+EXE_FILE="./build/semivisor.exe"
+NASM_SRC_DIR="./nasm"
+NASM_OBJ_DIR="./nasm/objs"
+NASM_LIB_DIR="./static-libs/windows-x64/"
+CERT="C:/WdkCert.pfx"
+CERT_PASS="pass"
+SERVICE_NAME="semi"
+
+log()  { echo -e "\e[34m[*]\e[0m $*"; }
+ok()   { echo -e "\e[32m[+]\e[0m $*"; }
+die()  { echo -e "\e[31m[-]\e[0m $*" >&2; exit 1; }
+
+# ── 1. Build nasm files ───────────────────────────────────────────────────────
+log "Building NASM files..."
+mkdir -p "$NASM_OBJ_DIR" "$NASM_LIB_DIR"
+for asm_file in "$NASM_SRC_DIR"/*.asm; do
+    [[ -e "$asm_file" ]] || die "No .asm files found in $NASM_SRC_DIR"
+    base=$(basename "$asm_file" .asm)
+    obj_file="$NASM_OBJ_DIR/${base}.obj"
+    lib_file="$NASM_LIB_DIR/${base}.lib"
+    log "  Assembling $asm_file → $obj_file"
+    nasm -f win64 "$asm_file" -o "$obj_file" || die "nasm failed for $asm_file"
+    log "  Archiving  $obj_file → $lib_file"
+    llvm-ar rcs "$lib_file" "$obj_file" || die "llvm-ar failed for $obj_file"
+    ok "  ${base}: assembled and archived"
+done
+ok "All NASM files built"
+
+# ── 2. Build project ──────────────────────────────────────────────────────────
+log "Building project..."
+c3c build --no-entry -z /dll || die "c3c build failed"
+[[ -f "$EXE_FILE" ]] || die "Expected output not found: $EXE_FILE"
+ok "Build succeeded → $EXE_FILE"
+
+# ── 3. Convert to .sys ────────────────────────────────────────────────────────
+log "Converting to driver image..."
+./scripts/cvtdrv "$EXE_FILE" || die "cvtdrv failed"
+[[ -f "$SYS_FILE" ]] || die "Expected output not found: $SYS_FILE"
+ok "Conversion succeeded → $SYS_FILE"
+

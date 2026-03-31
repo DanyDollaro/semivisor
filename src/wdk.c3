@@ -135,3 +135,84 @@ struct DriverObject
     DriverDispatch[IRP_MJ_MAXIMUM_FUNCTION + 1] major_function;
 }
 
+extern fn int sprintf_s(
+    char* buffer,
+    usz size_of_buffer,
+    char* format,
+    ...
+);
+
+extern fn uint dbgPrintEx(uint component_id, uint level, char* format, ...) @cname("DbgPrintEx");
+
+fn void __security_check_cookie(usz cookie) @export("__security_check_cookie")
+{
+    // this function is required for or the linker will give error
+}
+
+alias LargeInteger = long;
+
+struct TimeFields
+{
+    short year;
+    short month;
+    short day;
+    short hour;
+    short minute;
+    short second;
+    short milliseconds;
+    short weekday;
+}
+
+// Retrieves current system time (UTC)
+extern fn void keQuerySystemTimePrecise(
+    LargeInteger* current_time
+) @cname("KeQuerySystemTimePrecise");
+
+extern fn void rtlTimeToTimeFields(
+    LargeInteger* time,
+    TimeFields* time_fields
+) @cname("RtlTimeToTimeFields");
+
+extern fn void exSystemTimeToLocalTime(
+    LargeInteger* system_time,
+    LargeInteger* local_time
+) @cname("ExSystemTimeToLocalTime");
+
+struct ProcessorNumber
+{
+  ushort group;
+  char number;
+  char reserved;
+}
+
+extern fn uint keGetCurrentProcessorNumberEx(
+    ProcessorNumber* processor_number
+) @cname("KeGetCurrentProcessorNumberEx");
+
+const POOL_FLAG_REQUIRED_START    = 0x0000000000000001;
+const POOL_FLAG_USE_QUOTA         = 0x0000000000000001;     // Charge quota
+const POOL_FLAG_UNINITIALIZED     = 0x0000000000000002;     // Don't zero-initialize allocation
+const POOL_FLAG_SESSION           = 0x0000000000000004;     // Use session specific pool
+const POOL_FLAG_CACHE_ALIGNED     = 0x0000000000000008;     // Cache aligned allocation
+const POOL_FLAG_RESERVED1         = 0x0000000000000010;     // Reserved for system use
+const POOL_FLAG_RAISE_ON_FAILURE  = 0x0000000000000020;     // Raise exception on failure
+const POOL_FLAG_NON_PAGED         = 0x0000000000000040;     // Non paged pool NX
+const POOL_FLAG_NON_PAGED_EXECUTE = 0x0000000000000080;     // Non paged pool executable
+const POOL_FLAG_PAGED             = 0x0000000000000100;     // Paged pool
+const POOL_FLAG_RESERVED2         = 0x0000000000000200;     // Reserved for system use
+const POOL_FLAG_RESERVED3         = 0x0000000000000400;     // Reserved for system use
+const POOL_FLAG_REQUIRED_END      = 0x0000000080000000;
+const POOL_FLAG_OPTIONAL_START    = 0x0000000100000000;
+const POOL_FLAG_SPECIAL_POOL      = 0x0000000100000000;     // Make special pool allocation
+const POOL_FLAG_OPTIONAL_END      = 0x8000000000000000;
+
+extern fn void* exAllocatePool2(
+  ulong flags,
+  usz number_of_bytes,
+  uint tag
+) @cname("ExAllocatePool2");
+
+extern fn void exFreePoolWithTag(
+  void* p,
+  uint tag
+) @cname("ExFreePoolWithTag");
