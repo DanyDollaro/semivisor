@@ -1,4 +1,4 @@
-module logger;
+module log;
 
 import wdk;
 

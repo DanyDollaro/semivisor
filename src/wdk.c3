@@ -96,7 +96,15 @@ struct UnicodeString
     ushort* buffer;
 }
 
-alias DeviceObject = void*;
+alias IoTimer          = void*;
+alias Vpb              = void*;
+alias SecurityDescriptor = void*;
+alias DevObjExtension  = void*;
+
+alias KDeviceQueue     = void*;
+alias Kdpc             = void*;
+alias KEvent           = void*;
+
 alias Irp = void*;
 alias FastIoDispatch = void*;
 
@@ -133,6 +141,72 @@ struct DriverObject
     DriverStartIo driver_start_io;
     DriverUnload driver_unload;
     DriverDispatch[IRP_MJ_MAXIMUM_FUNCTION + 1] major_function;
+}
+
+union DeviceQueue
+{
+    void* list_entry;       // LIST_ENTRY
+    void* wait_context_block;
+}
+
+const uint DO_VERIFY_VOLUME                 = 0x00000002;
+const uint DO_BUFFERED_IO                   = 0x00000004;
+const uint DO_EXCLUSIVE                     = 0x00000008;
+const uint DO_DIRECT_IO                     = 0x00000010;
+const uint DO_MAP_IO_BUFFER                 = 0x00000020;
+const uint DO_DEVICE_HAS_NAME               = 0x00000040;
+const uint DO_DEVICE_INITIALIZING           = 0x00000080;
+const uint DO_SYSTEM_BOOT_PARTITION         = 0x00000100;
+const uint DO_LONG_TERM_REQUESTS            = 0x00000200;
+const uint DO_NEVER_LAST_DEVICE             = 0x00000400;
+const uint DO_SHUTDOWN_REGISTERED           = 0x00000800;
+const uint DO_BUS_ENUMERATED_DEVICE         = 0x00001000;
+const uint DO_POWER_PAGABLE                 = 0x00002000;
+const uint DO_POWER_INRUSH                  = 0x00004000;
+const uint DO_LOW_PRIORITY_FILESYSTEM       = 0x00010000;
+const uint DO_SUPPORTS_TRANSACTIONS         = 0x00040000;
+const uint DO_FORCE_NEITHER_IO              = 0x00080000;
+const uint DO_VOLUME_DEVICE_OBJECT          = 0x00100000;
+const uint DO_SYSTEM_SYSTEM_PARTITION       = 0x00200000;
+const uint DO_SYSTEM_CRITICAL_PARTITION     = 0x00400000;
+const uint DO_DISALLOW_EXECUTE              = 0x00800000;
+const uint DO_DEVICE_TO_BE_RESET            = 0x04000000;
+const uint DO_DEVICE_IRP_REQUIRES_EXTENSION = 0x08000000;
+const uint DO_DAX_VOLUME                    = 0x10000000;
+const uint DO_BOOT_CRITICAL                 = 0x20000000;
+
+const uint DRVO_REINIT_REGISTERED           = 0x00000008;
+const uint DRVO_INITIALIZED                 = 0x00000010;
+const uint DRVO_BOOTREINIT_REGISTERED       = 0x00000020;
+const uint DRVO_LEGACY_RESOURCES            = 0x00000040;
+
+struct DeviceObject
+{
+    short              type;
+    short              size;
+    int                reference_count;
+    DriverObject*      driver_object;
+    DeviceObject*      next_device;
+    DeviceObject*      attached_device;
+    Irp*               current_irp;
+    IoTimer*           timer;
+    uint               flags;
+    uint               characteristics;
+    Vpb*               vpb;
+    void*              device_extension;
+    uint               device_type;
+    char               stack_size;
+    DeviceQueue        queue;
+    uint               alignment_requirement;
+    KDeviceQueue       device_queue;
+    Kdpc               dpc;
+    uint               active_thread_count;
+    SecurityDescriptor security_descriptor;
+    KEvent             device_lock;
+    ushort             sector_size;
+    ushort             spare1;
+    DevObjExtension    device_object_extension;
+    void*              reserved;
 }
 
 extern fn int sprintf_s(
@@ -216,3 +290,143 @@ extern fn void exFreePoolWithTag(
   void* p,
   uint tag
 ) @cname("ExFreePoolWithTag");
+
+alias Kirql = char;
+
+extern fn Kirql keGetCurrentIrql()
+    @cname("KeGetCurrentIrql");
+
+const uint FILE_DEVICE_BEEP                    = 0x00000001;
+const uint FILE_DEVICE_CD_ROM                  = 0x00000002;
+const uint FILE_DEVICE_CD_ROM_FILE_SYSTEM      = 0x00000003;
+const uint FILE_DEVICE_CONTROLLER              = 0x00000004;
+const uint FILE_DEVICE_DATALINK                = 0x00000005;
+const uint FILE_DEVICE_DFS                     = 0x00000006;
+const uint FILE_DEVICE_DISK                    = 0x00000007;
+const uint FILE_DEVICE_DISK_FILE_SYSTEM        = 0x00000008;
+const uint FILE_DEVICE_FILE_SYSTEM             = 0x00000009;
+const uint FILE_DEVICE_INPORT_PORT             = 0x0000000a;
+const uint FILE_DEVICE_KEYBOARD                = 0x0000000b;
+const uint FILE_DEVICE_MAILSLOT                = 0x0000000c;
+const uint FILE_DEVICE_MIDI_IN                 = 0x0000000d;
+const uint FILE_DEVICE_MIDI_OUT                = 0x0000000e;
+const uint FILE_DEVICE_MOUSE                   = 0x0000000f;
+const uint FILE_DEVICE_MULTI_UNC_PROVIDER      = 0x00000010;
+const uint FILE_DEVICE_NAMED_PIPE              = 0x00000011;
+const uint FILE_DEVICE_NETWORK                 = 0x00000012;
+const uint FILE_DEVICE_NETWORK_BROWSER         = 0x00000013;
+const uint FILE_DEVICE_NETWORK_FILE_SYSTEM     = 0x00000014;
+const uint FILE_DEVICE_NULL                    = 0x00000015;
+const uint FILE_DEVICE_PARALLEL_PORT           = 0x00000016;
+const uint FILE_DEVICE_PHYSICAL_NETCARD        = 0x00000017;
+const uint FILE_DEVICE_PRINTER                 = 0x00000018;
+const uint FILE_DEVICE_SCANNER                 = 0x00000019;
+const uint FILE_DEVICE_SERIAL_MOUSE_PORT       = 0x0000001a;
+const uint FILE_DEVICE_SERIAL_PORT             = 0x0000001b;
+const uint FILE_DEVICE_SCREEN                  = 0x0000001c;
+const uint FILE_DEVICE_SOUND                   = 0x0000001d;
+const uint FILE_DEVICE_STREAMS                 = 0x0000001e;
+const uint FILE_DEVICE_TAPE                    = 0x0000001f;
+const uint FILE_DEVICE_TAPE_FILE_SYSTEM        = 0x00000020;
+const uint FILE_DEVICE_TRANSPORT               = 0x00000021;
+const uint FILE_DEVICE_UNKNOWN                 = 0x00000022;
+const uint FILE_DEVICE_VIDEO                   = 0x00000023;
+const uint FILE_DEVICE_VIRTUAL_DISK            = 0x00000024;
+const uint FILE_DEVICE_WAVE_IN                 = 0x00000025;
+const uint FILE_DEVICE_WAVE_OUT                = 0x00000026;
+const uint FILE_DEVICE_8042_PORT               = 0x00000027;
+const uint FILE_DEVICE_NETWORK_REDIRECTOR      = 0x00000028;
+const uint FILE_DEVICE_BATTERY                 = 0x00000029;
+const uint FILE_DEVICE_BUS_EXTENDER            = 0x0000002a;
+const uint FILE_DEVICE_MODEM                   = 0x0000002b;
+const uint FILE_DEVICE_VDM                     = 0x0000002c;
+const uint FILE_DEVICE_MASS_STORAGE            = 0x0000002d;
+const uint FILE_DEVICE_SMB                     = 0x0000002e;
+const uint FILE_DEVICE_KS                      = 0x0000002f;
+const uint FILE_DEVICE_CHANGER                 = 0x00000030;
+const uint FILE_DEVICE_SMARTCARD               = 0x00000031;
+const uint FILE_DEVICE_ACPI                    = 0x00000032;
+const uint FILE_DEVICE_DVD                     = 0x00000033;
+const uint FILE_DEVICE_FULLSCREEN_VIDEO        = 0x00000034;
+const uint FILE_DEVICE_DFS_FILE_SYSTEM         = 0x00000035;
+const uint FILE_DEVICE_DFS_VOLUME              = 0x00000036;
+const uint FILE_DEVICE_SERENUM                 = 0x00000037;
+const uint FILE_DEVICE_TERMSRV                 = 0x00000038;
+const uint FILE_DEVICE_KSEC                    = 0x00000039;
+const uint FILE_DEVICE_FIPS                    = 0x0000003a;
+const uint FILE_DEVICE_INFINIBAND              = 0x0000003b;
+const uint FILE_DEVICE_VMBUS                   = 0x0000003e;
+const uint FILE_DEVICE_CRYPT_PROVIDER          = 0x0000003f;
+const uint FILE_DEVICE_WPD                     = 0x00000040;
+const uint FILE_DEVICE_BLUETOOTH               = 0x00000041;
+const uint FILE_DEVICE_MT_COMPOSITE            = 0x00000042;
+const uint FILE_DEVICE_MT_TRANSPORT            = 0x00000043;
+const uint FILE_DEVICE_BIOMETRIC               = 0x00000044;
+const uint FILE_DEVICE_PMI                     = 0x00000045;
+const uint FILE_DEVICE_EHSTOR                  = 0x00000046;
+const uint FILE_DEVICE_DEVAPI                  = 0x00000047;
+const uint FILE_DEVICE_GPIO                    = 0x00000048;
+const uint FILE_DEVICE_USBEX                   = 0x00000049;
+const uint FILE_DEVICE_CONSOLE                 = 0x00000050;
+const uint FILE_DEVICE_NFP                     = 0x00000051;
+const uint FILE_DEVICE_SYSENV                  = 0x00000052;
+const uint FILE_DEVICE_VIRTUAL_BLOCK           = 0x00000053;
+const uint FILE_DEVICE_POINT_OF_SERVICE        = 0x00000054;
+const uint FILE_DEVICE_STORAGE_REPLICATION     = 0x00000055;
+const uint FILE_DEVICE_TRUST_ENV               = 0x00000056;
+const uint FILE_DEVICE_UCM                     = 0x00000057;
+const uint FILE_DEVICE_UCMTCPCI                = 0x00000058;
+const uint FILE_DEVICE_PERSISTENT_MEMORY       = 0x00000059;
+const uint FILE_DEVICE_NVDIMM                  = 0x0000005a;
+const uint FILE_DEVICE_HOLOGRAPHIC             = 0x0000005b;
+const uint FILE_DEVICE_SDFXHCI                 = 0x0000005c;
+const uint FILE_DEVICE_UCMUCSI                 = 0x0000005d;
+const uint FILE_DEVICE_PRM                     = 0x0000005e;
+const uint FILE_DEVICE_EVENT_COLLECTOR         = 0x0000005f;
+const uint FILE_DEVICE_USB4                    = 0x00000060;
+const uint FILE_DEVICE_SOUNDWIRE               = 0x00000061;
+const uint FILE_DEVICE_FABRIC_NVME             = 0x00000062;
+const uint FILE_DEVICE_SVM                     = 0x00000063;
+const uint FILE_DEVICE_HARDWARE_ACCELERATOR    = 0x00000064;
+const uint FILE_DEVICE_I3C                     = 0x00000065;
+
+const uint FILE_REMOVABLE_MEDIA                     = 0x00000001;
+const uint FILE_READ_ONLY_DEVICE                    = 0x00000002;
+const uint FILE_FLOPPY_DISKETTE                     = 0x00000004;
+const uint FILE_WRITE_ONCE_MEDIA                    = 0x00000008;
+const uint FILE_REMOTE_DEVICE                       = 0x00000010;
+const uint FILE_DEVICE_IS_MOUNTED                   = 0x00000020;
+const uint FILE_VIRTUAL_VOLUME                      = 0x00000040;
+const uint FILE_AUTOGENERATED_DEVICE_NAME           = 0x00000080;
+const uint FILE_DEVICE_SECURE_OPEN                  = 0x00000100;
+const uint FILE_CHARACTERISTIC_PNP_DEVICE           = 0x00000800;
+const uint FILE_CHARACTERISTIC_TS_DEVICE            = 0x00001000;
+const uint FILE_CHARACTERISTIC_WEBDAV_DEVICE        = 0x00002000;
+const uint FILE_CHARACTERISTIC_CSV                  = 0x00010000;
+const uint FILE_DEVICE_ALLOW_APPCONTAINER_TRAVERSAL = 0x00020000;
+const uint FILE_PORTABLE_DEVICE                     = 0x00040000;
+const uint FILE_REMOTE_DEVICE_VSMB                  = 0x00080000;
+const uint FILE_DEVICE_REQUIRE_SECURITY_CHECK       = 0x00100000;
+
+extern fn NtStatus ioCreateDevice(
+  DriverObject*  driver_object,
+  ulong          device_extension_size,
+  UnicodeString* device_name,
+  uint           device_type,
+  uint           device_characteristics,
+  bool           exclusive,
+  DeviceObject** device_object
+) @cname("IoCreateDevice");
+
+extern fn NtStatus ioCreateSymbolicLink(
+  UnicodeString* symbolic_link_name,
+  UnicodeString* device_name
+) @cname("IoCreateSymbolicLink");
+
+extern fn void ioDeleteDevice(
+  DeviceObject* device_object
+) @cname("IoDeleteDevice");
+
+extern fn NtStatus ioDeleteSymbolicLink(
+  UnicodeString* symbolic_link_name
+) @cname("IoDeleteSymbolicLink");
