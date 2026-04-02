@@ -3,3 +3,4 @@ out/
 run
 scripts/cvtdrv
 nasm/objs
+static-libs/windows-x64/nasm
