@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SYS_FILE="./build/semivisor.sys"
-EXE_FILE="./build/semivisor.exe"
+SEMIVISOR_SYS_FILE="./build/semivisor.sys"
+SEMIVISOR_EXE_FILE="./build/semivisor.exe"
+CLIENT_FILE="./build/client.exe"
 NASM_SRC_DIR="./nasm"
 NASM_OBJ_DIR="./nasm/objs"
 NASM_LIB_DIR="./static-libs/windows-x64/nasm/"
@@ -11,7 +12,7 @@ log()  { echo -e "\e[34m[*]\e[0m $*"; }
 ok()   { echo -e "\e[32m[+]\e[0m $*"; }
 die()  { echo -e "\e[31m[-]\e[0m $*" >&2; exit 1; }
 
-# ── 1. Build nasm files ───────────────────────────────────────────────────────
+# 1. Build nasm files
 log "Building NASM files..."
 mkdir -p "$NASM_OBJ_DIR" "$NASM_LIB_DIR"
 for asm_file in "$NASM_SRC_DIR"/*.asm; do
@@ -27,15 +28,21 @@ for asm_file in "$NASM_SRC_DIR"/*.asm; do
 done
 ok "All NASM files built"
 
-# ── 2. Build project ──────────────────────────────────────────────────────────
-log "Building project..."
-c3c build --no-entry -z /dll || die "c3c build failed"
-[[ -f "$EXE_FILE" ]] || die "Expected output not found: $EXE_FILE"
-ok "Build succeeded → $EXE_FILE"
+# 2. Build semivisor
+log "Building semivisor..."
+c3c build semivisor || die "c3c build semivisor failed"
+[[ -f "$SEMIVISOR_EXE_FILE" ]] || die "Expected output not found: $SEMIVISOR_EXE_FILE"
+ok "Semivisor build succeeded → $SEMIVISOR_EXE_FILE"
 
-# ── 3. Convert to .sys ────────────────────────────────────────────────────────
+# 3. Convert to .sys
 log "Converting to driver image..."
-./scripts/cvtdrv "$EXE_FILE" || die "cvtdrv failed"
-[[ -f "$SYS_FILE" ]] || die "Expected output not found: $SYS_FILE"
-ok "Conversion succeeded → $SYS_FILE"
+./scripts/cvtdrv "$SEMIVISOR_EXE_FILE" || die "cvtdrv failed"
+[[ -f "$SEMIVISOR_SYS_FILE" ]] || die "Expected output not found: $SEMIVISOR_SYS_FILE"
+ok "Semivisor conversion succeeded → $SEMIVISOR_SYS_FILE"
+
+# 4. Build the client
+log "Building client..."
+c3c build client || die "c3c build client failed"
+[[ -f "$CLIENT_FILE" ]] || die "Expected output not found: $CLIENT_FILE"
+ok "Client build succeeded → $CLIENT_FILE"
 

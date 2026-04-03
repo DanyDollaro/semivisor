@@ -13,8 +13,6 @@
   "authors": [ "John Doe <john.doe@example.com>" ],
   // Version using semantic versioning.
   "version": "0.1.0",
-  // Sources compiled for all targets.
-  "sources": [ "src/**" ],
   // Test sources compiled for all targets.
   "test-sources": [ "test/**" ],
   // C sources if the project also compiles C sources
@@ -26,21 +24,27 @@
   "build-dir": "build",
   // Output location, relative to project file.
   "output": "build",
-  // Since we are building a driver we will remove the libc dependencies and the std
-  "link-libc": false,
-  "use-stdlib": false,
   // Architecture and OS target.
   // You can use 'c3c --list-targets' to list all valid targets.
   // "target": "windows-x64",
   // Targets.
   "targets": {
     "semivisor": {
-      // Executable or library.
+      // This file will be compiled as an exe but then converted into a driver
+      "sources": [ "src/semivisor/**" ],
+      "type": "executable",
+      "target": "windows-x64",
+      // Since we are building a driver we will remove the libc dependencies and the std
+      "link-libc": false,
+      "use-stdlib": false,
+      "no-entry": true,
+      "link-args": [ "/dll" ]
+    },
+    "client": {
+      "sources": [ "src/client/**" ],
       "type": "executable",
       "target": "windows-x64"
-      // Additional libraries, sources
-      // and overrides of global settings here.
-    },
+    }
   },
   // Global settings.
   // CPU name, used for optimizations in the LLVM backend.
