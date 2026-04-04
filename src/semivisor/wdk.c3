@@ -4,13 +4,13 @@ module wdk;
 // Base types
 // =========================================================
 alias NtStatus     = uint;
-alias LargeInteger = long;   // LARGE_INTEGER  — 8 bytes (correct)
-alias Kirql        = char;
-alias KspinLock    = ulong;  // KSPIN_LOCK = ULONG_PTR — 8 bytes on x64 (correct)
+alias LargeInteger = long;   // LARGE_INTEGER  — 8 bytes
+alias Kirql        = char;   // KIRQL = UCHAR
+alias KspinLock    = ulong;  // KSPIN_LOCK = ULONG_PTR — 8 bytes on x64
 alias Handle       = void*;
 alias EProcess     = void*;
 alias EThread      = void*;
-alias Kaffinity    = ulong;  // KAFFINITY = ULONG_PTR  — 8 bytes on x64
+alias Kaffinity    = ulong;  // KAFFINITY = ULONG_PTR — 8 bytes on x64
 
 // Opaque kernel pointers
 alias IoTimer            = void*;
@@ -65,21 +65,21 @@ const NtStatus STATUS_NOTIFY_ENUM_DIR          = 0x0000010c;
 // =========================================================
 // NtStatus — Informational (0x4000xxxx)
 // =========================================================
-const NtStatus STATUS_OBJECT_NAME_EXISTS       = 0x40000000;
-const NtStatus STATUS_THREAD_WAS_SUSPENDED     = 0x40000001;
-const NtStatus STATUS_WORKING_SET_LIMIT_RANGE  = 0x40000002;
-const NtStatus STATUS_IMAGE_NOT_AT_BASE        = 0x40000003;
-const NtStatus STATUS_RXACT_STATE_CREATED      = 0x40000004;
-const NtStatus STATUS_SEGMENT_NOTIFICATION     = 0x40000005;
+const NtStatus STATUS_OBJECT_NAME_EXISTS      = 0x40000000;
+const NtStatus STATUS_THREAD_WAS_SUSPENDED    = 0x40000001;
+const NtStatus STATUS_WORKING_SET_LIMIT_RANGE = 0x40000002;
+const NtStatus STATUS_IMAGE_NOT_AT_BASE       = 0x40000003;
+const NtStatus STATUS_RXACT_STATE_CREATED     = 0x40000004;
+const NtStatus STATUS_SEGMENT_NOTIFICATION    = 0x40000005;
 
 // =========================================================
 // NtStatus — Warning (0x8000xxxx)
 // =========================================================
-const NtStatus STATUS_GUARD_PAGE_VIOLATION     = 0x80000001;
-const NtStatus STATUS_DATATYPE_MISALIGNMENT    = 0x80000002;
-const NtStatus STATUS_BREAKPOINT               = 0x80000003;
-const NtStatus STATUS_SINGLE_STEP             = 0x80000004;
-const NtStatus STATUS_BUFFER_OVERFLOW          = 0x80000005;
+const NtStatus STATUS_GUARD_PAGE_VIOLATION  = 0x80000001;
+const NtStatus STATUS_DATATYPE_MISALIGNMENT = 0x80000002;
+const NtStatus STATUS_BREAKPOINT            = 0x80000003;
+const NtStatus STATUS_SINGLE_STEP          = 0x80000004;
+const NtStatus STATUS_BUFFER_OVERFLOW       = 0x80000005;
 
 // =========================================================
 // NtStatus — Error (0xC000xxxx)
@@ -160,6 +160,8 @@ struct SingleListEntry
     SingleListEntry* next;
 }
 
+// IO_STATUS_BLOCK
+// The first field is a union of NtStatus / void* (pointer-sized on x64)
 struct IoStatusBlock
 {
     union {
@@ -224,13 +226,16 @@ extern fn Kirql keAcquireSpinLockRaiseToDpc(
 
 // =========================================================
 // FAST_MUTEX
+// sizeof(FAST_MUTEX) == 32 on x64
 // =========================================================
 struct FastMutex
 {
-    int    count;       // LONG  — 4 bytes  (FIX: was long)
-    void*  owner;       // PKTHREAD pointer
+    int    count;       // LONG  — 4 bytes
+    uint   _pad0;       // explicit padding to align owner to 8 bytes
+    void*  owner;       // PKTHREAD — 8 bytes
     uint   contention;  // ULONG — 4 bytes
-    Kevent event;       // KEVENT (gate)
+    uint   _pad1;       // padding before KEVENT (8-byte aligned)
+    Kevent event;       // KEVENT (gate) — 24 bytes
     uint   old_irql;    // ULONG — 4 bytes
 }
 
@@ -281,7 +286,7 @@ alias DriverInitialize = fn NtStatus(DriverObject*, UnicodeString*);
 alias DriverUnload     = fn void(DriverObject*);
 alias DriverDispatch   = fn NtStatus(DeviceObject*, Irp*);
 alias CancelRoutine    = fn void(DeviceObject*, Irp*);
-alias IoApcRoutine     = fn void(void*, IoStatusBlock*, uint);
+alias IoApcRoutine     = fn void(void*, IoStatusBlock*, ulong);  // last param ULONG_PTR
 alias IoCompletion     = fn NtStatus(DeviceObject*, Irp*, void*);
 
 // =========================================================
@@ -470,40 +475,35 @@ const uint FILE_DEVICE_I3C                 = 0x00000065;
 
 // =========================================================
 // DEVICE_OBJECT
+// The queue field is a KDEVICE_QUEUE (not a plain union);
+// on x64 sizeof(KDEVICE_QUEUE) == 32.  We keep it opaque.
 // =========================================================
-union DeviceQueue
-{
-    void* list_entry;
-    void* wait_context_block;
-}
-
 struct DeviceObject
 {
-    short              type;
-    short              size;
-    int                reference_count;
-    DriverObject*      driver_object;
-    DeviceObject*      next_device;
-    DeviceObject*      attached_device;
-    Irp*               current_irp;
-    IoTimer*           timer;
-    uint               flags;
-    uint               characteristics;
-    Vpb*               vpb;
-    void*              device_extension;
-    uint               device_type;
-    char               stack_size;
-    DeviceQueue        queue;
-    uint               alignment_requirement;
-    void*              device_queue;
-    void*              dpc;
-    uint               active_thread_count;
+    short         type;
+    short         size;
+    int           reference_count;
+    DriverObject* driver_object;
+    DeviceObject* next_device;
+    DeviceObject* attached_device;
+    Irp*          current_irp;
+    IoTimer*      timer;
+    uint          flags;
+    uint          characteristics;
+    Vpb*          vpb;
+    void*         device_extension;
+    uint          device_type;
+    char          stack_size;
+    char[3]       _pad0;             // padding — stack_size is CCHAR, next field 8-aligned
+    ulong[4]      device_queue;      // KDEVICE_QUEUE — 32 bytes on x64 (opaque)
+    ulong[4]      dpc;               // KDPC — 32 bytes on x64 (opaque)
+    uint          active_thread_count;
     SecurityDescriptor security_descriptor;
-    Kevent             device_lock;
-    ushort             sector_size;
-    ushort             spare1;
-    DevObjExtension    device_object_extension;
-    void*              reserved;
+    Kevent        device_lock;
+    ushort        sector_size;
+    ushort        spare1;
+    DevObjExtension device_object_extension;
+    void*         reserved;
 }
 
 // =========================================================
@@ -520,6 +520,7 @@ struct FileObject
     void*         section_object_pointer;
     void*         private_cache_map;
     NtStatus      final_status;
+    uint          _pad0;             // pad NtStatus (4 bytes) up to 8 before pointer
     FileObject*   related_file_object;
     bool          lock_operation;
     bool          delete_pending;
@@ -531,7 +532,7 @@ struct FileObject
     bool          shared_delete;
     uint          flags;
     UnicodeString file_name;
-    long          current_byte_offset;  // LARGE_INTEGER — 8 bytes (correct)
+    long          current_byte_offset;  // LARGE_INTEGER — 8 bytes
     uint          waiters;
     uint          busy;
     void*         last_lock;
@@ -611,11 +612,11 @@ const uint IRP_MN_SET_POWER      = 0x02;
 const uint IRP_MN_QUERY_POWER    = 0x03;
 
 // =========================================================
-// IO_STACK_LOCATION
+// IO_STACK_LOCATION parameter sub-structs
 // =========================================================
 struct IoStackCreate
 {
-    uint   security_context;
+    uint   security_context;  // PIO_SECURITY_CONTEXT — kept as uint (pointer in real WDK, but often cast)
     uint   options;
     ushort file_attributes;
     ushort share_access;
@@ -626,14 +627,14 @@ struct IoStackRead
 {
     uint length;
     uint key;
-    long byte_offset;  // LARGE_INTEGER — 8 bytes (correct)
+    long byte_offset;  // LARGE_INTEGER — 8 bytes
 }
 
 struct IoStackWrite
 {
     uint length;
     uint key;
-    long byte_offset;  // LARGE_INTEGER — 8 bytes (correct)
+    long byte_offset;  // LARGE_INTEGER — 8 bytes
 }
 
 struct IoStackQueryDirectory
@@ -649,9 +650,12 @@ struct IoStackDeviceIoControl
     uint  output_buffer_length;
     uint  input_buffer_length;
     uint  io_control_code;
+    uint  _pad;              // explicit pad — next field is pointer-aligned
     void* type3_input_buffer;
 }
 
+// The Parameters union inside IO_STACK_LOCATION.
+// All sub-structs must fit within the largest member (IoStackRead/Write at 16 bytes).
 union IoStackParameters
 {
     IoStackCreate          create;
@@ -661,6 +665,9 @@ union IoStackParameters
     IoStackDeviceIoControl device_io_control;
 }
 
+// =========================================================
+// IO_STACK_LOCATION
+// =========================================================
 struct IoStackLocation
 {
     char              major_function;
@@ -675,53 +682,60 @@ struct IoStackLocation
 }
 
 // =========================================================
-// IRP
+// AssociatedIrp / IrpOverlay / IrpTail
+// Kept as named aliases for documentation only.
+// They are NOT used as field types inside Irp — they are
+// inlined as anonymous unions directly in the struct below.
 // =========================================================
-struct AssociatedIrp
+
+alias KProcessorMode = char;
+
+enum Mode
 {
-    union {
-        Irp*  master_irp;
-        int   irp_count;
-        void* system_buffer;
-    }
+    KERNEL_MODE,
+    USER_MODE,
+    MAXIMUM_MODE
 }
 
-struct IrpOverlay
+struct KDeviceQueueEntry
 {
-    union {
-        struct {
-            union {
-                IoApcRoutine user_apc_routine;
-                void*        issuing_process;
-            }
-            void* user_apc_context;
-        }
-        long allocation_size;  // LARGE_INTEGER — 8 bytes (correct)
-    }
+    ListEntry list_entry;
+    uint      sort_key;
+    bool      inserted;
 }
 
-struct IrpTail
+struct KApc
 {
-    union {
-        struct {
-            void*[4]         driver_context;
-            void*            thread;
-            char*            auxiliary_buffer;
-            ListEntry        list_entry;
-            IoStackLocation* current_stack_location;
-            void*            original_file_object;
-        }
-        void* completion_key;
-    }
+    char  type;
+    char  all_flags;
+    char  size;
+    char  spare_byte1;
+    uint  spare_long0;
+    void* thread;
+    ListEntry apc_list_entry;
+    void*[3]  reserved;
+    void* normal_context;
+    void* system_argument1;
+    void* system_argument2;
+    char  apc_state_index;
+    char  apc_mode;
+    bool  inserted;
 }
 
 struct Irp
 {
-    short          type;
-    ushort         size;
-    void*          mdl_address;
-    uint           flags;
-    AssociatedIrp  associated_irp;
+    short  type;
+    ushort size;
+    void*  mdl_address;
+    uint   flags;
+
+    union associated_irp
+    {
+        Irp*  master_irp;
+        int   irp_count;
+        void* system_buffer;
+    }
+
     ListEntry      thread_list_entry;
     IoStatusBlock  io_status;
     char           requestor_mode;
@@ -729,15 +743,67 @@ struct Irp
     char           stack_count;
     char           current_location;
     bool           cancel;
-    char           cancel_irql;
+    Kirql          cancel_irql;
     char           apc_environment;
     char           allocation_flags;
-    IoStatusBlock* user_iosb;
-    void*          user_event;
-    IrpOverlay     overlay;
-    CancelRoutine  cancel_routine;
-    void*          user_buffer;
-    IrpTail        tail;
+
+    union
+    {
+        IoStatusBlock* user_iosb;
+        void*          io_ring_context;
+    }
+
+    void* user_event;
+
+    union overlay
+    {
+        struct asynchronous_parameters
+        {
+            union
+            {
+                IoApcRoutine user_apc_routine;
+                void*        issuing_process;
+            }
+            union
+            {
+                void* user_apc_context;
+                void* io_ring;
+            }
+        }
+        long allocation_size;
+    }
+
+    CancelRoutine cancel_routine;
+    void*         user_buffer;
+
+    union tail
+    {
+        struct overlay
+        {
+            union
+            {
+                KDeviceQueueEntry device_queue_entry;
+                struct
+                {
+                    void*[4] driver_context;
+                }
+            }
+            void*  thread;
+            char*  auxiliary_buffer;
+            struct
+            {
+                ListEntry list_entry;
+                union
+                {
+                    IoStackLocation* current_stack_location;
+                    uint             packet_type;
+                }
+            }
+            void*  original_file_object;
+        }
+        KApc  apc;
+        void* completion_key;
+    }
 }
 
 // =========================================================
@@ -795,7 +861,7 @@ const LockOperation IO_WRITE_ACCESS  = 1;
 const LockOperation IO_MODIFY_ACCESS = 2;
 
 // =========================================================
-// Pool flags  (POOL_FLAGS — ULONG64 = 8 bytes, correct)
+// Pool flags  (POOL_FLAGS — ULONG64 = 8 bytes)
 // =========================================================
 const ulong POOL_FLAG_USE_QUOTA         = 0x0000000000000001;
 const ulong POOL_FLAG_UNINITIALIZED     = 0x0000000000000002;
@@ -974,7 +1040,7 @@ extern fn void keBugCheck(
 
 extern fn void keBugCheckEx(
     uint  bug_check_code,
-    ulong p1,   // ULONG_PTR — 8 bytes on x64 (correct)
+    ulong p1,   // ULONG_PTR — 8 bytes on x64
     ulong p2,
     ulong p3,
     ulong p4
@@ -1003,7 +1069,7 @@ extern fn void keLeaveGuardedRegion()   @cname("KeLeaveGuardedRegion");
 // Ke — Processor affinity / count
 // =========================================================
 extern fn Kaffinity keQueryActiveProcessors()
-    @cname("KeQueryActiveProcessors");  // returns KAFFINITY = ULONG_PTR (correct)
+    @cname("KeQueryActiveProcessors");
 
 extern fn uint keQueryActiveProcessorCountEx(
     ushort group_number
@@ -1024,14 +1090,14 @@ extern fn void keQueryTickCount(
     LargeInteger* tick_count
 ) @cname("KeQueryTickCount");
 
-extern fn uint keQueryTimeIncrement()   // ULONG — 4 bytes (FIX: was ulong)
+extern fn uint  keQueryTimeIncrement()      // ULONG — 4 bytes
     @cname("KeQueryTimeIncrement");
 
-extern fn ulong keQueryInterruptTime()  // ULONGLONG — 8 bytes (correct)
+extern fn ulong keQueryInterruptTime()      // ULONGLONG — 8 bytes
     @cname("KeQueryInterruptTime");
 
 extern fn ulong keQueryInterruptTimePrecise(
-    ulong* qpc_time_stamp               // ULONG64* — 8 bytes (correct)
+    ulong* qpc_time_stamp                   // ULONG64* — 8 bytes
 ) @cname("KeQueryInterruptTimePrecise");
 
 extern fn ulong keQueryUnbiasedInterruptTime()  // ULONGLONG — 8 bytes
@@ -1040,21 +1106,21 @@ extern fn ulong keQueryUnbiasedInterruptTime()  // ULONGLONG — 8 bytes
 // =========================================================
 // Ke — Bugcheck codes (common subset)
 // =========================================================
-const uint IRQL_NOT_LESS_OR_EQUAL          = 0x0000000a;
-const uint DRIVER_IRQL_NOT_LESS_OR_EQUAL   = 0x000000d1;
+const uint IRQL_NOT_LESS_OR_EQUAL                     = 0x0000000a;
+const uint KMODE_EXCEPTION_NOT_HANDLED                = 0x0000001e;
+const uint SYSTEM_SERVICE_EXCEPTION                   = 0x0000003b;
+const uint PAGE_FAULT_IN_NONPAGED_AREA                = 0x00000050;
+const uint DRIVER_IRQL_NOT_LESS_OR_EQUAL              = 0x000000d1;
 const uint DRIVER_PAGE_FAULT_BEYOND_END_OF_ALLOCATION = 0x000000e7;
-const uint SYSTEM_SERVICE_EXCEPTION        = 0x0000003b;
-const uint KMODE_EXCEPTION_NOT_HANDLED     = 0x0000001e;
-const uint PAGE_FAULT_IN_NONPAGED_AREA     = 0x00000050;
-const uint DRIVER_CORRUPTED_EXPOOL         = 0x000000c5;
-const uint ATTEMPTED_WRITE_TO_READONLY_MEMORY = 0x000000be;
+const uint ATTEMPTED_WRITE_TO_READONLY_MEMORY         = 0x000000be;
+const uint DRIVER_CORRUPTED_EXPOOL                    = 0x000000c5;
 
 // =========================================================
-// Ke — Semaphore
+// Ke — Semaphore  (sizeof(KSEMAPHORE) == 20 on x64)
 // =========================================================
 struct Ksemaphore
 {
-    int[5] opaque;  // sizeof(KSEMAPHORE) == 20 on x64
+    int[5] opaque;
 }
 
 extern fn void keInitializeSemaphore(
@@ -1071,11 +1137,11 @@ extern fn int keReleaseSemaphore(
 ) @cname("KeReleaseSemaphore");
 
 // =========================================================
-// Ke — Mutex (KMUTEX)
+// Ke — Mutex  (sizeof(KMUTEX) == 32 on x64)
 // =========================================================
 struct Kmutex
 {
-    int[8] opaque;  // sizeof(KMUTEX) == 32 on x64
+    int[8] opaque;
 }
 
 extern fn void keInitializeMutex(
@@ -1093,11 +1159,11 @@ extern fn int keReadStateMutex(
 ) @cname("KeReadStateMutex");
 
 // =========================================================
-// Ke — Timer (KTIMER)
+// Ke — Timer  (sizeof(KTIMER) == 40 on x64)
 // =========================================================
 struct Ktimer
 {
-    int[10] opaque;  // sizeof(KTIMER) == 40 on x64
+    int[10] opaque;
 }
 
 alias TimerType = int;
@@ -1115,14 +1181,14 @@ extern fn void keInitializeTimerEx(
 
 extern fn bool keSetTimer(
     Ktimer*      timer,
-    LargeInteger due_time,  // LARGE_INTEGER by value — 8 bytes (correct)
+    LargeInteger due_time,  // LARGE_INTEGER by value — 8 bytes
     void*        dpc
 ) @cname("KeSetTimer");
 
 extern fn bool keSetTimerEx(
     Ktimer*      timer,
     LargeInteger due_time,
-    int          period,    // LONG — 4 bytes (correct)
+    int          period,    // LONG — 4 bytes
     void*        dpc
 ) @cname("KeSetTimerEx");
 
@@ -1135,13 +1201,13 @@ extern fn bool keReadStateTimer(
 ) @cname("KeReadStateTimer");
 
 // =========================================================
-// Ke — DPC (KDPC)
+// Ke — DPC  (sizeof(KDPC) == 32 on x64)
 // =========================================================
 alias DpcRoutine = fn void(void* dpc, void* deferred_context, void* sa1, void* sa2);
 
 struct Kdpc
 {
-    int[8] opaque;  // sizeof(KDPC) == 32 on x64
+    int[8] opaque;
 }
 
 extern fn void keInitializeDpc(
@@ -1331,7 +1397,7 @@ extern fn NtStatus rtlGuidFromString(
 
 // =========================================================
 // Rtl — AVL generic table
-// RTL_AVL_TABLE is 72 bytes on x64 → 9 × ulong (FIX: was ulong[20])
+// sizeof(RTL_AVL_TABLE) == 72 on x64  →  9 × ulong
 // =========================================================
 alias TableCompareRoutine  = fn int(void* table, void* first_struct, void* second_struct);
 alias TableAllocateRoutine = fn void*(void* table, usz byte_size);
@@ -1339,7 +1405,7 @@ alias TableFreeRoutine     = fn void(void* table, void* buffer);
 
 struct RtlAvlTable
 {
-    ulong[9] opaque;  // 72 bytes on x64 (FIX: was ulong[20])
+    ulong[9] opaque;  // 72 bytes on x64
 }
 
 extern fn void rtlInitializeGenericTableAvl(
@@ -1426,13 +1492,13 @@ extern fn uint rtlNumberOfClearBits(RtlBitmap* h) @cname("RtlNumberOfClearBits")
 // =========================================================
 // Rtl — CRC / hash
 // =========================================================
-extern fn uint rtlComputeCrc32(
+extern fn uint  rtlComputeCrc32(
     uint  partial_crc,
     void* buffer,
     usz   length
 ) @cname("RtlComputeCrc32");
 
-extern fn ulong rtlComputeCrc64(     // ULONGLONG — 8 bytes (correct)
+extern fn ulong rtlComputeCrc64(   // ULONGLONG — 8 bytes
     ulong partial_crc,
     void* buffer,
     usz   length
@@ -1460,7 +1526,7 @@ extern fn ushort rtlCaptureStackBackTrace(
 ) @cname("RtlCaptureStackBackTrace");
 
 extern fn void rtlCaptureContext(
-    void* context_record    // PCONTEXT — kept void* to avoid full CONTEXT def
+    void* context_record    // PCONTEXT — opaque
 ) @cname("RtlCaptureContext");
 
 // =========================================================
@@ -1471,10 +1537,10 @@ const int EXCEPTION_CONTINUE_SEARCH    =  0;
 const int EXCEPTION_EXECUTE_HANDLER    =  1;
 
 // =========================================================
-// Ex — Pool / Misc
+// Ex — Pool
 // =========================================================
 extern fn void* exAllocatePool2(
-    ulong flags,            // POOL_FLAGS — 8 bytes (correct)
+    ulong flags,            // POOL_FLAGS — 8 bytes
     usz   number_of_bytes,
     uint  tag
 ) @cname("ExAllocatePool2");
@@ -1492,7 +1558,7 @@ extern fn char exGetPreviousMode() @cname("ExGetPreviousMode");
 struct EresourceThread
 {
     ListEntry list_entry;
-    ulong     thread_and_flags;  // ERESOURCE_THREAD = ULONG_PTR — 8 bytes (correct)
+    ulong     thread_and_flags;  // ERESOURCE_THREAD = ULONG_PTR — 8 bytes
 }
 
 struct Eresource
@@ -1501,8 +1567,9 @@ struct Eresource
     EresourceThread*  owner_table;
     short             active_count;
     ushort            flag;
-    void*             shared_waiters;
-    void*             exclusive_waiters;
+    uint              _pad0;                   // pad before pointer fields
+    void*             shared_waiters;          // PKSEMAPHORE
+    void*             exclusive_waiters;       // PKEVENT
     EresourceThread   owner_entry;
     uint              active_entries;
     uint              content_length;
@@ -1536,7 +1603,7 @@ extern fn void exReleaseResourceLite(
 
 extern fn void exReleaseResourceForThreadLite(
     Eresource* resource,
-    ulong      resource_thread_id  // ERESOURCE_THREAD = ULONG_PTR — 8 bytes (correct)
+    ulong      resource_thread_id  // ERESOURCE_THREAD = ULONG_PTR — 8 bytes
 ) @cname("ExReleaseResourceForThreadLite");
 
 extern fn bool exIsResourceAcquiredExclusiveLite(
@@ -1553,7 +1620,7 @@ extern fn void exConvertExclusiveToSharedLite(
 
 // =========================================================
 // Ex — Lookaside lists
-// GENERAL_LOOKASIDE_POOL is 256 bytes → 32 × ulong (correct)
+// GENERAL_LOOKASIDE_POOL == 256 bytes  →  32 × ulong
 // =========================================================
 alias AllocateFunction = fn void*(uint pool_type, usz size, uint tag);
 alias FreeFunction     = fn void(void* buffer);
@@ -1572,8 +1639,8 @@ extern fn void exInitializeNPagedLookasideList(
     ushort               depth
 ) @cname("ExInitializeNPagedLookasideList");
 
-extern fn void  exDeleteNPagedLookasideList(NpagedLookasideList* l) @cname("ExDeleteNPagedLookasideList");
-extern fn void* exAllocateFromNPagedLookasideList(NpagedLookasideList* l) @cname("ExAllocateFromNPagedLookasideList");
+extern fn void  exDeleteNPagedLookasideList(NpagedLookasideList* l)              @cname("ExDeleteNPagedLookasideList");
+extern fn void* exAllocateFromNPagedLookasideList(NpagedLookasideList* l)        @cname("ExAllocateFromNPagedLookasideList");
 extern fn void  exFreeToNPagedLookasideList(NpagedLookasideList* l, void* entry) @cname("ExFreeToNPagedLookasideList");
 
 extern fn void exInitializePagedLookasideList(
@@ -1586,8 +1653,8 @@ extern fn void exInitializePagedLookasideList(
     ushort              depth
 ) @cname("ExInitializePagedLookasideList");
 
-extern fn void  exDeletePagedLookasideList(PagedLookasideList* l) @cname("ExDeletePagedLookasideList");
-extern fn void* exAllocateFromPagedLookasideList(PagedLookasideList* l) @cname("ExAllocateFromPagedLookasideList");
+extern fn void  exDeletePagedLookasideList(PagedLookasideList* l)              @cname("ExDeletePagedLookasideList");
+extern fn void* exAllocateFromPagedLookasideList(PagedLookasideList* l)        @cname("ExAllocateFromPagedLookasideList");
 extern fn void  exFreeToPagedLookasideList(PagedLookasideList* l, void* entry) @cname("ExFreeToPagedLookasideList");
 
 // =========================================================
@@ -1619,15 +1686,15 @@ extern fn void exNotifyCallback(
 ) @cname("ExNotifyCallback");
 
 // =========================================================
-// Ex — Push lock (EX_PUSH_LOCK)
+// Ex — Push lock (EX_PUSH_LOCK = ULONG_PTR — 8 bytes on x64)
 // =========================================================
-bitstruct ExPushLock : ulong   // ULONG_PTR — 8 bytes on x64
+bitstruct ExPushLock : ulong
 {
-    bool locked         : 0;
-    bool waiting        : 1;
-    bool waking         : 2;
-    bool multiple_shared: 3;
-    ulong shared        : 4..63;
+    bool  locked          : 0;
+    bool  waiting         : 1;
+    bool  waking          : 2;
+    bool  multiple_shared : 3;
+    ulong shared          : 4..63;
 }
 
 extern fn void exInitializePushLock(
@@ -1651,30 +1718,29 @@ extern fn void exReleasePushLockExclusive(
 ) @cname("ExReleasePushLockExclusive");
 
 // =========================================================
-// Interlocked — 32-bit  (LONG = C long = 4 bytes)
-// FIX: all were 'long' (8 bytes); correct type is 'int' (4 bytes)
+// Interlocked — 32-bit  (LONG = int = 4 bytes)
 // =========================================================
-extern fn int interlockedIncrement(int* addend)                          @cname("InterlockedIncrement");
-extern fn int interlockedDecrement(int* addend)                          @cname("InterlockedDecrement");
-extern fn int interlockedExchange(int* target, int value)                @cname("InterlockedExchange");
+extern fn int interlockedIncrement(int* addend)                         @cname("InterlockedIncrement");
+extern fn int interlockedDecrement(int* addend)                         @cname("InterlockedDecrement");
+extern fn int interlockedExchange(int* target, int value)               @cname("InterlockedExchange");
 extern fn int interlockedCompareExchange(int* dest, int xchg, int cmp)  @cname("InterlockedCompareExchange");
-extern fn int interlockedAdd(int* addend, int value)                     @cname("InterlockedAdd");
-extern fn int interlockedOr(int* dest, int value)                        @cname("InterlockedOr");
-extern fn int interlockedAnd(int* dest, int value)                       @cname("InterlockedAnd");
-extern fn int interlockedXor(int* dest, int value)                       @cname("InterlockedXor");
-extern fn int interlockedExchangeAdd(int* addend, int value)             @cname("InterlockedExchangeAdd");
+extern fn int interlockedAdd(int* addend, int value)                    @cname("InterlockedAdd");
+extern fn int interlockedOr(int* dest, int value)                       @cname("InterlockedOr");
+extern fn int interlockedAnd(int* dest, int value)                      @cname("InterlockedAnd");
+extern fn int interlockedXor(int* dest, int value)                      @cname("InterlockedXor");
+extern fn int interlockedExchangeAdd(int* addend, int value)            @cname("InterlockedExchangeAdd");
 
 // =========================================================
-// Interlocked — 64-bit  (LONGLONG = __int64 = 8 bytes, correct)
+// Interlocked — 64-bit  (LONGLONG = long = 8 bytes)
 // =========================================================
-extern fn long interlockedIncrement64(long* addend)                           @cname("InterlockedIncrement64");
-extern fn long interlockedDecrement64(long* addend)                           @cname("InterlockedDecrement64");
-extern fn long interlockedExchange64(long* target, long value)                @cname("InterlockedExchange64");
+extern fn long interlockedIncrement64(long* addend)                          @cname("InterlockedIncrement64");
+extern fn long interlockedDecrement64(long* addend)                          @cname("InterlockedDecrement64");
+extern fn long interlockedExchange64(long* target, long value)               @cname("InterlockedExchange64");
 extern fn long interlockedCompareExchange64(long* dest, long xchg, long cmp) @cname("InterlockedCompareExchange64");
-extern fn long interlockedExchangeAdd64(long* addend, long value)             @cname("InterlockedExchangeAdd64");
-extern fn long interlockedOr64(long* dest, long value)                        @cname("InterlockedOr64");
-extern fn long interlockedAnd64(long* dest, long value)                       @cname("InterlockedAnd64");
-extern fn long interlockedXor64(long* dest, long value)                       @cname("InterlockedXor64");
+extern fn long interlockedExchangeAdd64(long* addend, long value)            @cname("InterlockedExchangeAdd64");
+extern fn long interlockedOr64(long* dest, long value)                       @cname("InterlockedOr64");
+extern fn long interlockedAnd64(long* dest, long value)                      @cname("InterlockedAnd64");
+extern fn long interlockedXor64(long* dest, long value)                      @cname("InterlockedXor64");
 
 // =========================================================
 // Probe
@@ -1685,8 +1751,8 @@ extern fn void probeForWrite(void* address, usz length, uint alignment) @cname("
 // =========================================================
 // Ob — Object manager
 // =========================================================
-extern fn void obReferenceObject(void* object)     @cname("ObReferenceObject");
-extern fn void obDereferenceObject(void* object)   @cname("ObDereferenceObject");
+extern fn void obReferenceObject(void* object)   @cname("ObReferenceObject");
+extern fn void obDereferenceObject(void* object) @cname("ObDereferenceObject");
 
 extern fn NtStatus obReferenceObjectByHandle(
     Handle handle,
@@ -1710,10 +1776,10 @@ extern fn NtStatus obOpenObjectByPointer(
 // =========================================================
 // Ps — Process / Thread
 // =========================================================
-extern fn EProcess psGetCurrentProcess()    @cname("PsGetCurrentProcess");
-extern fn EThread  psGetCurrentThread()     @cname("PsGetCurrentThread");
-extern fn void*    psGetCurrentProcessId()  @cname("PsGetCurrentProcessId");
-extern fn void*    psGetCurrentThreadId()   @cname("PsGetCurrentThreadId");
+extern fn EProcess psGetCurrentProcess()   @cname("PsGetCurrentProcess");
+extern fn EThread  psGetCurrentThread()    @cname("PsGetCurrentThread");
+extern fn void*    psGetCurrentProcessId() @cname("PsGetCurrentProcessId");
+extern fn void*    psGetCurrentThreadId()  @cname("PsGetCurrentThreadId");
 
 extern fn NtStatus psLookupProcessByProcessId(
     void*     process_id,
@@ -1725,8 +1791,8 @@ extern fn NtStatus psLookupThreadByThreadId(
     EThread* thread
 ) @cname("PsLookupThreadByThreadId");
 
-extern fn void* psGetProcessImageFileName(EProcess process) @cname("PsGetProcessImageFileName");
-extern fn EProcess psGetThreadProcess(EThread thread)       @cname("PsGetThreadProcess");
+extern fn void*    psGetProcessImageFileName(EProcess process) @cname("PsGetProcessImageFileName");
+extern fn EProcess psGetThreadProcess(EThread thread)          @cname("PsGetThreadProcess");
 
 // =========================================================
 // Ps — System threads
@@ -1791,9 +1857,10 @@ struct PsCreateNotifyInfo
 {
     usz                     size;
     PsCreateNotifyInfoFlags flags;
+    uint                    _pad0;    // pad flags (4 bytes) before pointer
     EProcess                parent_process;
     void*                   creating_thread_id;
-    void*                   file_object;
+    void*                   file_object;          // PFILE_OBJECT
     UnicodeString*          image_file_name;
     UnicodeString*          command_line;
     NtStatus                creation_status;
@@ -1804,7 +1871,7 @@ struct PsCreateNotifyInfo
 // =========================================================
 extern fn NtStatus ioCreateDevice(
     DriverObject*  driver_object,
-    uint           device_extension_size,  // ULONG — 4 bytes (FIX: was ulong)
+    uint           device_extension_size,  // ULONG — 4 bytes
     UnicodeString* device_name,
     uint           device_type,
     uint           device_characteristics,
@@ -1817,8 +1884,8 @@ extern fn NtStatus ioCreateSymbolicLink(
     UnicodeString* device_name
 ) @cname("IoCreateSymbolicLink");
 
-extern fn void     ioDeleteDevice(DeviceObject* device_object)          @cname("IoDeleteDevice");
-extern fn NtStatus ioDeleteSymbolicLink(UnicodeString* symbolic_link_name) @cname("IoDeleteSymbolicLink");
+extern fn void     ioDeleteDevice(DeviceObject* device_object)                @cname("IoDeleteDevice");
+extern fn NtStatus ioDeleteSymbolicLink(UnicodeString* symbolic_link_name)    @cname("IoDeleteSymbolicLink");
 
 extern fn DeviceObject* ioAttachDeviceToDeviceStack(
     DeviceObject* source_device,
@@ -1950,15 +2017,15 @@ const DeviceRelationType TRANSPORT_RELATIONS    = 6;
 
 struct DeviceRelations
 {
-    uint             count;
-    DeviceObject*[1] objects;   // variable-length; treat as flexible array
+    uint          count;
+    DeviceObject* objects;  // flexible array — access as (DeviceObject**)&objects
 }
 
 // =========================================================
 // Io — Error logging
 // =========================================================
 extern fn void* ioAllocateErrorLogEntry(void* io_object, char entry_size) @cname("IoAllocateErrorLogEntry");
-extern fn void  ioWriteErrorLogEntry(void* error_log_entry)                @cname("IoWriteErrorLogEntry");
+extern fn void  ioWriteErrorLogEntry(void* error_log_entry)               @cname("IoWriteErrorLogEntry");
 
 // =========================================================
 // Mm — Memory
@@ -1969,24 +2036,22 @@ extern fn void mmProbeAndLockPages(
     LockOperation operation
 ) @cname("MmProbeAndLockPages");
 
-extern fn void   mmUnlockPages(void* mdl)                      @cname("MmUnlockPages");
-extern fn void*  mmGetSystemAddressForMdlSafe(void* mdl, uint priority) @cname("MmGetSystemAddressForMdlSafe");
-extern fn bool   mmIsAddressValid(void* virtual_address)        @cname("MmIsAddressValid");
+extern fn void  mmUnlockPages(void* mdl)                                       @cname("MmUnlockPages");
+extern fn void* mmGetSystemAddressForMdlSafe(void* mdl, uint priority)         @cname("MmGetSystemAddressForMdlSafe");
+extern fn bool  mmIsAddressValid(void* virtual_address)                        @cname("MmIsAddressValid");
+extern fn void* mmAllocateNonCachedMemory(usz number_of_bytes)                 @cname("MmAllocateNonCachedMemory");
+extern fn void  mmFreeNonCachedMemory(void* base_address, usz number_of_bytes) @cname("MmFreeNonCachedMemory");
 
-extern fn void*  mmAllocateNonCachedMemory(usz number_of_bytes) @cname("MmAllocateNonCachedMemory");
-extern fn void   mmFreeNonCachedMemory(void* base_address, usz number_of_bytes) @cname("MmFreeNonCachedMemory");
-
-extern fn void*  mmAllocateContiguousMemory(
+extern fn void* mmAllocateContiguousMemory(
     usz          number_of_bytes,
-    LargeInteger highest_acceptable_address  // PHYSICAL_ADDRESS = LARGE_INTEGER — 8 bytes (correct)
+    LargeInteger highest_acceptable_address  // PHYSICAL_ADDRESS = LARGE_INTEGER — 8 bytes
 ) @cname("MmAllocateContiguousMemory");
 
-extern fn void mmFreeContiguousMemory(void* base_address) @cname("MmFreeContiguousMemory");
-
-extern fn ulong mmGetPhysicalAddress(void* base_address) @cname("MmGetPhysicalAddress"); // PHYSICAL_ADDRESS — 8 bytes (correct)
+extern fn void  mmFreeContiguousMemory(void* base_address) @cname("MmFreeContiguousMemory");
+extern fn ulong mmGetPhysicalAddress(void* base_address)   @cname("MmGetPhysicalAddress");  // PHYSICAL_ADDRESS — 8 bytes
 
 extern fn void* mmMapIoSpace(
-    ulong physical_address,   // PHYSICAL_ADDRESS — 8 bytes (correct)
+    ulong physical_address,  // PHYSICAL_ADDRESS — 8 bytes
     usz   number_of_bytes,
     int   cache_type
 ) @cname("MmMapIoSpace");
@@ -2005,10 +2070,12 @@ struct MemoryBasicInformation
     void* base_address;
     void* allocation_base;
     uint  allocation_protect;
+    uint  _pad0;           // pad before SIZE_T
     usz   region_size;
     uint  state;
     uint  protect;
     uint  type;
+    uint  _pad1;           // trailing pad to keep struct size a multiple of 8
 }
 
 // Page-protection constants
@@ -2036,12 +2103,12 @@ const uint MEM_RESET     = 0x00080000;
 const uint MEM_IMAGE     = 0x01000000;
 
 extern fn NtStatus zwAllocateVirtualMemory(
-    Handle  process_handle,
-    void**  base_address,
-    ulong   zero_bits,      // ULONG_PTR — 8 bytes on x64 (correct)
-    usz*    region_size,
-    uint    allocation_type,
-    uint    protect
+    Handle process_handle,
+    void** base_address,
+    ulong  zero_bits,       // ULONG_PTR — 8 bytes on x64
+    usz*   region_size,
+    uint   allocation_type,
+    uint   protect
 ) @cname("ZwAllocateVirtualMemory");
 
 extern fn NtStatus zwFreeVirtualMemory(
@@ -2236,20 +2303,22 @@ struct SystemProcessInformation
 {
     uint          next_entry_offset;
     uint          number_of_threads;
-    long[3]       spare_li;          // LARGE_INTEGER[3] — 8 bytes each (correct)
-    long          create_time;       // LARGE_INTEGER — 8 bytes (correct)
+    long[3]       spare_li;         // LARGE_INTEGER[3] — 8 bytes each
+    long          create_time;      // LARGE_INTEGER
     long          user_time;
     long          kernel_time;
     UnicodeString image_name;
-    int           base_priority;     // KPRIORITY = LONG — 4 bytes (correct)
+    int           base_priority;    // KPRIORITY = LONG — 4 bytes
+    uint          _pad0;
     void*         unique_process_id;
     void*         inherited_from_unique_process_id;
     uint          handle_count;
     uint          session_id;
-    ulong         unique_process_key;  // ULONG_PTR — 8 bytes (correct)
+    ulong         unique_process_key;   // ULONG_PTR — 8 bytes
     usz           peak_virtual_size;
     usz           virtual_size;
     uint          page_fault_count;
+    uint          _pad1;
 }
 
 alias ProcessInformationClass = int;
@@ -2261,11 +2330,11 @@ const ProcessInformationClass PROCESS_IMAGE_FILE_NAME         = 27;
 const ProcessInformationClass PROCESS_PROTECT_INFORMATION     = 61;
 
 alias ThreadInformationClass = int;
-const ThreadInformationClass THREAD_BASIC_INFORMATION_CLASS    = 0;
-const ThreadInformationClass THREAD_TIMES                      = 1;
-const ThreadInformationClass THREAD_PRIORITY                   = 2;
-const ThreadInformationClass THREAD_BASE_PRIORITY              = 3;
-const ThreadInformationClass THREAD_QUERY_SET_WIN32_PRIORITY   = 9;
+const ThreadInformationClass THREAD_BASIC_INFORMATION_CLASS  = 0;
+const ThreadInformationClass THREAD_TIMES                    = 1;
+const ThreadInformationClass THREAD_PRIORITY                 = 2;
+const ThreadInformationClass THREAD_BASE_PRIORITY            = 3;
+const ThreadInformationClass THREAD_QUERY_SET_WIN32_PRIORITY = 9;
 
 extern fn NtStatus zwQueryInformationProcess(
     Handle                  process_handle,
@@ -2286,9 +2355,11 @@ extern fn NtStatus zwQueryInformationThread(
 struct ProcessBasicInformation
 {
     NtStatus exit_status;
+    uint     _pad0;
     void*    peb_base_address;
-    usz      affinity_mask;       // KAFFINITY = ULONG_PTR — 8 bytes (correct)
-    int      base_priority;       // KPRIORITY = LONG — 4 bytes (correct)
+    usz      affinity_mask;    // KAFFINITY = ULONG_PTR — 8 bytes
+    int      base_priority;    // KPRIORITY = LONG — 4 bytes
+    uint     _pad1;
     void*    unique_process_id;
     void*    inherited_from_unique_process_id;
 }
@@ -2315,11 +2386,11 @@ const RegNotifyClass REG_NOTIFY_CLASS_POST_CREATE_KEY       = 17;
 extern fn NtStatus cmRegisterCallback(
     CmRegistryCallback function,
     void*              context,
-    LargeInteger*      cookie      // LARGE_INTEGER* — 8 bytes (correct)
+    LargeInteger*      cookie      // LARGE_INTEGER* — 8 bytes
 ) @cname("CmRegisterCallback");
 
 extern fn NtStatus cmUnRegisterCallback(
-    LargeInteger cookie            // LARGE_INTEGER by value — 8 bytes (correct)
+    LargeInteger cookie             // LARGE_INTEGER by value — 8 bytes
 ) @cname("CmUnRegisterCallback");
 
 // =========================================================
@@ -2342,15 +2413,15 @@ extern fn NtStatus seQueryInformationToken(
     void**                token_information
 ) @cname("SeQueryInformationToken");
 
-extern fn bool   seTokenIsAdmin(void* token)       @cname("SeTokenIsAdmin");
-extern fn bool   seTokenIsRestricted(void* token)  @cname("SeTokenIsRestricted");
+extern fn bool seTokenIsAdmin(void* token)      @cname("SeTokenIsAdmin");
+extern fn bool seTokenIsRestricted(void* token) @cname("SeTokenIsRestricted");
 
 extern fn NtStatus seQuerySessionIdToken(
     void*  token,
     uint*  session_id
 ) @cname("SeQuerySessionIdToken");
 
-// Privilege index constants — ULONG (4 bytes) (FIX: were ulong)
+// Privilege index constants — ULONG (4 bytes)
 const uint SE_CREATE_TOKEN_PRIVILEGE       = 2;
 const uint SE_ASSIGNPRIMARYTOKEN_PRIVILEGE = 3;
 const uint SE_LOCK_MEMORY_PRIVILEGE        = 4;
@@ -2368,7 +2439,7 @@ const uint SE_MANAGE_VOLUME_PRIVILEGE      = 28;
 const uint SE_IMPERSONATE_PRIVILEGE        = 29;
 const uint SE_CREATE_GLOBAL_PRIVILEGE      = 30;
 
-// LUID — used to represent a privilege in token calls
+// LUID
 struct Luid
 {
     uint low_part;   // ULONG — 4 bytes
@@ -2378,7 +2449,7 @@ struct Luid
 struct LuidAndAttributes
 {
     Luid luid;
-    uint attributes;  // SE_PRIVILEGE_ENABLED etc.
+    uint attributes;
 }
 
 const uint SE_PRIVILEGE_ENABLED_BY_DEFAULT = 0x00000001;
@@ -2402,4 +2473,3 @@ extern fn int sprintf_s(
     char* format,
     ...
 );
-

@@ -5,6 +5,20 @@ import wkk;
 import wdk;
 import log;
 
+// TODO: place these macro in a more meaningful file
+// macro for testing
+macro @funclog(; @body())
+{
+    log::print($$FUNC +++ " start");
+    defer log::print($$FUNC +++ " end");
+    @body();
+}
+
+macro uint ctl_code(uint device_type, uint function, uint method, uint access)
+{
+    return (device_type << 16) | (access << 14) | (function << 2) | method;
+}
+
 //
 // Globals
 //
@@ -30,7 +44,10 @@ UnicodeString symbolic_link =
 
 fn void? driver_setup(DriverObject* driver_object, UnicodeString* registry_path)
 {
-    driver_object.driver_unload = &driver_unload;
+    driver_object.driver_unload = &native_driver_unload;
+    driver_object.major_function[wdk::IRP_MJ_CREATE] = &complete_irp_with_success;
+    driver_object.major_function[wdk::IRP_MJ_CLOSE] = &complete_irp_with_success;
+    driver_object.major_function[wdk::IRP_MJ_DEVICE_CONTROL] = &native_mj_device_control;
 
     // Create the device object
     DeviceObject* device_object;
@@ -40,11 +57,6 @@ fn void? driver_setup(DriverObject* driver_object, UnicodeString* registry_path)
 
     // Create the symbolic link for usermode applications
     wkk::io_create_symbolic_link(&symbolic_link, &device_name)!;
-
-    driver_object.major_function[wdk::IRP_MJ_CREATE] = null;
-    driver_object.major_function[wdk::IRP_MJ_CLOSE] = null;
-    driver_object.major_function[wdk::IRP_MJ_DEVICE_CONTROL] = &irp_driver_device_io_control;
-    driver_object.major_function[wdk::IRP_MJ_CREATE] = null;
 }
 
 fn void? driver_cleanup(DriverObject* driver_object)
@@ -53,10 +65,17 @@ fn void? driver_cleanup(DriverObject* driver_object)
     wkk::io_delete_device(driver_object.device_object);
 }
 
-fn NtStatus? driver_device_io_control(DeviceObject* device_object, Irp* irp)
+fn NtStatus? device_control(DeviceObject* device_object, Irp* irp)
 {
-    wkk::io_complete_request(irp, wdk::IO_NO_INCREMENT);
+    IoStackLocation* stack = irp.tail.overlay.current_stack_location;
+    uint code = stack.parameters.device_io_control.io_control_code;
 
+    log::print("servicing IOCTL %Xh", code);
+
+    irp.io_status.status = wdk::STATUS_SUCCESS;
+    irp.io_status.information = 0;
+
+    wkk::io_complete_request(irp, wdk::IO_NO_INCREMENT);
     return wdk::STATUS_SUCCESS;
 }
 
@@ -64,7 +83,7 @@ fn NtStatus? driver_device_io_control(DeviceObject* device_object, Irp* irp)
 // Native driver entries
 //
 
-fn NtStatus driver_entry(DriverObject* driver_object, UnicodeString* registry_path)
+fn NtStatus native_driver_entry(DriverObject* driver_object, UnicodeString* registry_path)
     @export("DriverEntry")
 {
     log::init();
@@ -76,7 +95,7 @@ fn NtStatus driver_entry(DriverObject* driver_object, UnicodeString* registry_pa
         : wdk::STATUS_UNSUCCESSFUL;
 }
 
-fn void driver_unload(DriverObject* driver_object)
+fn void native_driver_unload(DriverObject* driver_object)
 {
     if (catch err = driver_cleanup(driver_object))
     {
@@ -88,16 +107,25 @@ fn void driver_unload(DriverObject* driver_object)
     log::destroy();
 }
 
-fn NtStatus irp_driver_device_io_control(DeviceObject* device_object, Irp* irp)
+fn NtStatus native_mj_device_control(DeviceObject* device_object, Irp* irp)
 {
-    if (catch err = driver_device_io_control(device_object, irp))
+    if (catch err = device_control(device_object, irp))
     {
-        log::print("driver_device_io_control failed %llXh", err);
+        log::print("device_control failed %llXh", err);
 
         // TODO: write a function that converts fault to ntstatusses
         return wdk::STATUS_UNSUCCESSFUL;
     }
 
+    return wdk::STATUS_SUCCESS;
+}
+
+fn NtStatus complete_irp_with_success(DeviceObject* device_object, Irp* irp) => @funclog()
+{
+    irp.io_status.status = wdk::STATUS_SUCCESS;
+    irp.io_status.information = 0;
+
+    wkk::io_complete_request(irp, wdk::IO_NO_INCREMENT);
     return wdk::STATUS_SUCCESS;
 }
 
