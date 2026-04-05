@@ -130,6 +130,5 @@ fn NtStatus complete_irp_with_success(DeviceObject* device_object, Irp* irp) => 
 }
 
 // required by the linker to compile
-fn void __security_check_cookie(usz cookie) @export("__security_check_cookie")
-{
-}
+fn void __security_check_cookie(usz cookie) @export("__security_check_cookie") {}
+
