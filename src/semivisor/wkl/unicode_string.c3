@@ -5,8 +5,8 @@ import wdk;
 macro UnicodeString constant($string)
 {
     return {
-        .length = $string.len,
-        .maximum_length = $string.len + 2,
+        .length = ($string.len * 2),
+        .maximum_length = ($string.len + 1) * 2,
         .buffer = &&$$wstr16($string)
     };
 }
