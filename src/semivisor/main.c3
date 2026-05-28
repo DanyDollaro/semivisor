@@ -4,6 +4,7 @@ import wkl::core;
 import wkl;
 import wdk;
 import log;
+import wkl::unicode_string;
 
 // TODO: place these macro in a more meaningful file
 // macro for testing
@@ -23,20 +24,11 @@ macro uint ctl_code(uint device_type, uint function, uint method, uint access)
 // Globals
 //
 
-// TODO: create a macro to create constant wide strings
 UnicodeString device_name =
-{
-    .length = 36,
-    .maximum_length = 38,
-    .buffer = &&$$wstr16("\\Device\\Semivisor")
-};
+    unicode_string::constant("\\Device\\Semivisor");
 
 UnicodeString symbolic_link =
-{
-    .length = 42,
-    .maximum_length = 44,
-    .buffer = &&$$wstr16("\\DosDevices\\Semivisor")
-};
+    unicode_string::constant("\\DosDevices\\Semivisor");
 
 //
 // Globals
