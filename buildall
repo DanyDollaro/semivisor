@@ -30,7 +30,7 @@ ok "All NASM files built"
 
 # 2. Build semivisor
 log "Building semivisor..."
-c3c build semivisor || die "c3c build semivisor failed"
+c3c build semivisor --warn-builtin=no || die "c3c build semivisor failed"
 [[ -f "$SEMIVISOR_EXE_FILE" ]] || die "Expected output not found: $SEMIVISOR_EXE_FILE"
 ok "Semivisor build succeeded → $SEMIVISOR_EXE_FILE"
 
