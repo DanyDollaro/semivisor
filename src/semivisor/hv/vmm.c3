@@ -1,2 +1,2 @@
-module vmm;
+module hv::vmm;
 

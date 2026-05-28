@@ -1,4 +1,4 @@
-module wkk::ntstatus;
+module wkl::ntstatus;
 
 import wdk;
 

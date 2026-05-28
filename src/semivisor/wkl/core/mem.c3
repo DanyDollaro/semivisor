@@ -1,4 +1,4 @@
-module wkk::core::mem;
+module wkl::core::mem;
 
 <*
  Copy memory from src to dst efficiently, assuming the memory ranges do not overlap.

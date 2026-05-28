@@ -1,8 +1,8 @@
-module wkk::core::allocators::non_paged_allocator;
+module wkl::core::allocators::non_paged_allocator;
 
 import wdk;
-import wkk::core::mem;
-import wkk::core::alloc;
+import wkl::core::mem;
+import wkl::core::alloc;
 
 struct NonPagedAllocator (Allocator)
 {

@@ -1,7 +1,7 @@
 module semivisor;
 
-import wkk::core;
-import wkk;
+import wkl::core;
+import wkl;
 import wdk;
 import log;
 
@@ -39,6 +39,12 @@ UnicodeString symbolic_link =
 };
 
 //
+// Globals
+//
+
+// Vmm vmm;
+
+//
 // Wrapped driver entries
 //
 
@@ -51,18 +57,18 @@ fn void? driver_setup(DriverObject* driver_object, UnicodeString* registry_path)
 
     // Create the device object
     DeviceObject* device_object;
-    wkk::io_create_device(driver_object, 0, &device_name, wdk::FILE_DEVICE_UNKNOWN,
+    wkl::io_create_device(driver_object, 0, &device_name, wdk::FILE_DEVICE_UNKNOWN,
         wdk::FILE_DEVICE_SECURE_OPEN, true, &device_object)!;
-    defer catch wkk::io_delete_device(device_object);
+    defer catch wkl::io_delete_device(device_object);
 
     // Create the symbolic link for usermode applications
-    wkk::io_create_symbolic_link(&symbolic_link, &device_name)!;
+    wkl::io_create_symbolic_link(&symbolic_link, &device_name)!;
 }
 
 fn void? driver_cleanup(DriverObject* driver_object)
 {
-    wkk::io_delete_symbolic_link(&symbolic_link)!;
-    wkk::io_delete_device(driver_object.device_object);
+    wkl::io_delete_symbolic_link(&symbolic_link)!;
+    wkl::io_delete_device(driver_object.device_object);
 }
 
 fn NtStatus? device_control(DeviceObject* device_object, Irp* irp)
@@ -75,7 +81,7 @@ fn NtStatus? device_control(DeviceObject* device_object, Irp* irp)
     irp.io_status.status = wdk::STATUS_SUCCESS;
     irp.io_status.information = 0;
 
-    wkk::io_complete_request(irp, wdk::IO_NO_INCREMENT);
+    wkl::io_complete_request(irp, wdk::IO_NO_INCREMENT);
     return wdk::STATUS_SUCCESS;
 }
 
@@ -87,7 +93,7 @@ fn NtStatus native_driver_entry(DriverObject* driver_object, UnicodeString* regi
     @export("DriverEntry")
 {
     log::init();
-    log::print(">>>>>>>>>>>>>>>>>>>>>>> DRIVER COMPILED AT %s %s <<<<<<<<<<<<<<<<<<<<<<<",
+    log::print(">>>>>>>>>>>>>>>>>>>> DRIVER COMPILED AT %s %s <<<<<<<<<<<<<<<<<<<<",
         $$DATE, $$TIME);
 
     return @ok(driver_setup(driver_object, registry_path))
@@ -125,10 +131,10 @@ fn NtStatus complete_irp_with_success(DeviceObject* device_object, Irp* irp) => 
     irp.io_status.status = wdk::STATUS_SUCCESS;
     irp.io_status.information = 0;
 
-    wkk::io_complete_request(irp, wdk::IO_NO_INCREMENT);
+    wkl::io_complete_request(irp, wdk::IO_NO_INCREMENT);
     return wdk::STATUS_SUCCESS;
 }
 
-// required by the linker to compile
+// symbols required by the linker to compile
 fn void __security_check_cookie(usz cookie) @export("__security_check_cookie") {}
-
+fn void _dllMainCRTStartup() @export("_DllMainCRTStartup") {}

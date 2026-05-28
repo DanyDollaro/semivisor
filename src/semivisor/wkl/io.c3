@@ -1,7 +1,7 @@
-module wkk;
+module wkl;
 
 import wdk;
-import wkk::ntstatus;
+import wkl::ntstatus;
 import log;
 
 fn NtStatus? io_create_device(

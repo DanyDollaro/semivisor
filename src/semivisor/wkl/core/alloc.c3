@@ -1,7 +1,7 @@
-module wkk::core::alloc;
+module wkl::core::alloc;
 
 import wdk;
-import wkk::core::mem;
+import wkl::core::mem;
 
 faultdef
     FAILED_ALLOCATION;
@@ -26,13 +26,15 @@ fn void*? alloc_non_paged(usz size, uint tag)
         : FAILED_ALLOCATION~;
 }
 
+/*
 fn void*? realloc_non_paged(void* ptr, usz size, uint tag, usz new_size)
 {
     void* p = alloc_non_paged(new_size, tag)!;
-    mem::copy(p, ptr, size);
+    mem::copy(p, ptr, size); // TODO: compiler error: Not inlined
     free_non_paged(ptr, tag);
     return p;
 }
+*/
 
 fn void free_non_paged(void* ptr, uint tag)
 {

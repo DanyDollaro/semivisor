@@ -1,4 +1,4 @@
-module wkk::core::builtin;
+module wkl::core::builtin;
 
 <*
  Return the excuse in the Optional if it is Empty, otherwise

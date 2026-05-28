@@ -1,4 +1,4 @@
-module krt::thread;
+module wkl::thread;
 
 import wdk;
 

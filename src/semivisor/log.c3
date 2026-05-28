@@ -6,8 +6,8 @@ import wdk;
 /* Imported functions                                                                             */
 /* ============================================================================================== */
 
-extern fn void write_port_uchar(void* port, char value) @extern("write_port_uchar");
-extern fn char read_port_uchar(void* port) @extern("read_port_uchar");
+extern fn void write_port_uchar(void* port, char value) @cname("write_port_uchar");
+extern fn char read_port_uchar(void* port) @cname("read_port_uchar");
 
 /* ============================================================================================== */
 /* Constants                                                                                      */
@@ -106,7 +106,7 @@ fn void write_line(char[] str, void* base = DEFAULT_COM_PORT)
 macro void print($format, ...)
 {
     char[512] buffer;
-    wdk::sprintf_s(&buffer, buffer.len, $format, $vasplat);
+    wdk::sprintf_s(&buffer, buffer.len, $format, ...$vaarg);
     write_line(buffer[..]);
 }
 
@@ -124,7 +124,7 @@ macro void debug_log($format, ...)
     char[512] buffer;
     String $final_format = "[" +++ $$MODULE +++ ":" +++ $$FUNC +++ "] %02hu:%02hu:%02hu.%03hu #%Xh > " +++
         $format +++ "\r\n";
-    wdk::sprintf_s(&buffer, buffer.len, $final_format, time.hour, time.minute, time.second, time.milliseconds, core, $vasplat);
+    wdk::sprintf_s(&buffer, buffer.len, $final_format, time.hour, time.minute, time.second, time.milliseconds, core, ...$vaarg);
 
     write_string(buffer[..]);
 }

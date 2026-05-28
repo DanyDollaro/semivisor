@@ -53,7 +53,7 @@ fn int main(String[] args)
 
     if (!device)
     {
-        uint error = win32::getLastError();
+        int error = (int)win32::getLastError();
         io::printfn("Error while opening the file %Xh", error);
         return error;
     }
