@@ -40,7 +40,10 @@ fn NtStatus? io_delete_symbolic_link(
     return ntstatus::ntstatus_to_fault(wdk::ioDeleteSymbolicLink(symbolic_link_name));
 }
 
-fn void io_complete_request(Irp* irp, char priority_boos)
+fn void io_complete_request(
+    Irp* irp,
+    char priority_boos
+) @inline
 {
     wdk::iofCompleteRequest(irp, priority_boos);
 }
