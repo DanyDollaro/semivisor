@@ -3,7 +3,7 @@ module semivisor;
 import wkl::core;
 import wkl;
 import wdk;
-import log;
+import hv::log;
 import wkl::unicode_string;
 
 // TODO: place these macro in a more meaningful file

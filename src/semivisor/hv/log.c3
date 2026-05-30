@@ -1,4 +1,4 @@
-module log;
+module hv::log;
 
 import wdk;
 
