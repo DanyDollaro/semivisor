@@ -111,7 +111,7 @@ faultdef
     FAULT_PASSWORD_EXPIRED,
     FAULT_ACCOUNT_LOCKED_OUT;
 
-fn NtStatus? ntstatus_to_fault(NtStatus status)
+fn NtStatus? to_fault(NtStatus status)
 {
     if (!nt_error(status))
     {

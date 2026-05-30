@@ -2,7 +2,7 @@ module wkl;
 
 import wdk;
 import wkl::ntstatus;
-import log;
+import hv::log;
 
 fn NtStatus? io_create_device(
   DriverObject*  driver_object,
@@ -14,7 +14,7 @@ fn NtStatus? io_create_device(
   DeviceObject** device_object
 ) @inline
 {
-    return ntstatus::ntstatus_to_fault(wdk::ioCreateDevice(driver_object, 0, device_name, wdk::FILE_DEVICE_UNKNOWN,
+    return ntstatus::to_fault(wdk::ioCreateDevice(driver_object, 0, device_name, wdk::FILE_DEVICE_UNKNOWN,
         wdk::FILE_DEVICE_SECURE_OPEN, true, device_object));
 }
 
@@ -23,7 +23,7 @@ fn NtStatus? io_create_symbolic_link(
   UnicodeString* device_name
 ) @inline
 {
-    return ntstatus::ntstatus_to_fault(wdk::ioCreateSymbolicLink(symbolic_link_name, device_name));
+    return ntstatus::to_fault(wdk::ioCreateSymbolicLink(symbolic_link_name, device_name));
 }
 
 fn void io_delete_device(
@@ -37,7 +37,7 @@ fn NtStatus? io_delete_symbolic_link(
   UnicodeString* symbolic_link_name
 ) @inline
 {
-    return ntstatus::ntstatus_to_fault(wdk::ioDeleteSymbolicLink(symbolic_link_name));
+    return ntstatus::to_fault(wdk::ioDeleteSymbolicLink(symbolic_link_name));
 }
 
 fn void io_complete_request(
